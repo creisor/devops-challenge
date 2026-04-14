@@ -7,6 +7,14 @@ WORKDIR /app
 RUN corepack enable pnpm
 
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY prisma.config.ts ./
+COPY prisma ./prisma
+
+# prisma.config.ts calls env("POSTGRES_PRISMA_URL") at load time (even during
+# `prisma generate`). A placeholder is sufficient — no DB connection is made.
+ARG POSTGRES_PRISMA_URL=postgresql://placeholder:placeholder@localhost:5432/placeholder
+ENV POSTGRES_PRISMA_URL=${POSTGRES_PRISMA_URL}
+
 RUN pnpm install --frozen-lockfile --prod
 
 # ── Stage 2: build ────────────────────────────────────────────────────────────
@@ -18,6 +26,9 @@ RUN corepack enable pnpm
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY prisma.config.ts ./
 COPY prisma ./prisma
+
+ARG POSTGRES_PRISMA_URL=postgresql://placeholder:placeholder@localhost:5432/placeholder
+ENV POSTGRES_PRISMA_URL=${POSTGRES_PRISMA_URL}
 
 # Install all deps (including dev) so prisma generate and next build work
 RUN pnpm install --frozen-lockfile
