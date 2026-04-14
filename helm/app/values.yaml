@@ -1,0 +1,42 @@
+image:
+  repository: ghcr.io/creisor/devops-challenge
+  tag: latest
+  pullPolicy: Always
+
+replicaCount: 2
+
+ingress:
+  host: devops-challenge.local
+
+# POSTGRES_PRISMA_URL is assembled from these components at deploy time.
+# Override at install time:
+#   helm upgrade --install app ./helm/app \
+#     --set postgres.host=<svc> \
+#     --set postgres.password=<password>
+postgres:
+  host: postgres-postgresql.devops-challenge.svc.cluster.local
+  port: 5432
+  user: devops
+  password: ""
+  database: currencies
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 256Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi
+
+autoscaling:
+  minReplicas: 2
+  maxReplicas: 3
+  targetCPUUtilizationPercentage: 70
+
+livenessProbe:
+  initialDelaySeconds: 15
+  periodSeconds: 10
+
+readinessProbe:
+  initialDelaySeconds: 10
+  periodSeconds: 5

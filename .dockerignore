@@ -10,3 +10,15 @@ node_modules
 # Ignore .next and .turbo folders
 .next
 .turbo
+
+# Infrastructure / docs — not needed in image
+helm/
+scripts/
+docs/
+.github/
+worktrees/
+
+# Local dev files
+*.local
+.env*
+!.env.example

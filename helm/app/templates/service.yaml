@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "devops-challenge.fullname" . }}
+  labels:
+    {{- include "devops-challenge.labels" . | nindent 4 }}
+spec:
+  type: ClusterIP
+  selector:
+    {{- include "devops-challenge.selectorLabels" . | nindent 4 }}
+  ports:
+    - port: 80
+      targetPort: 3000
+      protocol: TCP

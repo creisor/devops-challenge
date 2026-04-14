@@ -1,0 +1,37 @@
+# Bitnami postgresql chart values
+# Install: helm repo add bitnami https://charts.bitnami.com/bitnami
+# Install: helm repo update
+# Deploy:  helm upgrade --install postgres bitnami/postgresql -f helm/postgres/values.yaml -n devops-challenge --create-namespace
+
+image:
+  tag: "17"
+
+# Credentials are sourced from a pre-existing Kubernetes Secret.
+# Create it before the first install:
+#
+#   kubectl create secret generic postgres-credentials \
+#     --from-literal=postgres-password=<password> \
+#     --from-literal=password=<password> \
+#     --from-literal=replication-password=<password> \
+#     -n devops-challenge
+#
+global:
+  postgresql:
+    auth:
+      existingSecret: postgres-credentials
+      username: devops
+      database: currencies
+
+primary:
+  persistence:
+    enabled: true
+    storageClass: local-path
+    size: 5Gi
+
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
