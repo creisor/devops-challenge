@@ -1,0 +1,7 @@
+# CVE-2026-33671 — picomatch vendored inside next/dist/compiled/picomatch
+#
+# This copy of picomatch is bundled directly into the Next.js distribution and
+# cannot be upgraded independently via pnpm. We have already upgraded Next.js
+# to the latest available release (16.2.3). This finding will be resolved
+# automatically when Next.js ships an updated compiled bundle.
+CVE-2026-33671
