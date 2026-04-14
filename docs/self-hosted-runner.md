@@ -57,15 +57,22 @@ k3s ships with metrics-server disabled by default:
 kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml
 ```
 
-### 2. Install Postgres (one-time, not managed by CI)
+### 2. Bootstrap Postgres (one-time, not managed by CI)
 
-The Bitnami `postgresql` chart is installed once manually. CI only manages the
-app chart.
+The Bitnami `postgresql` chart references a pre-existing Kubernetes Secret for
+its credentials (`existingSecret: postgres-credentials` in
+`helm/postgres/values.yaml`). **The secret must be created before the chart is
+installed.** Follow these steps in order.
 
-#### 2a. Understand the credentials secret
+#### Step 1 — Create the namespace
 
-The `postgres-credentials` Kubernetes Secret has three keys, each for a
-different Postgres role:
+```bash
+kubectl create namespace devops-challenge
+```
+
+#### Step 2 — Generate passwords and create the credentials secret
+
+The secret has three keys, one per Postgres role:
 
 | Key | Role | Used by |
 |-----|------|---------|
@@ -73,18 +80,7 @@ different Postgres role:
 | `password` | Application user (`devops`) | The Next.js app and migration Job |
 | `replication-password` | Replication standby user | Bitnami chart internals |
 
-**The Bitnami chart automatically creates the `devops` user and the
-`currencies` database on first install** using the values set in
-`helm/postgres/values.yaml` (`global.postgresql.auth.username: devops`,
-`global.postgresql.auth.database: currencies`). You do not need to create
-them manually.
-
-The `password` value here must match the `POSTGRES_PASSWORD` GitHub Actions
-secret, since the app chart assembles the connection string from it.
-
-#### 2b. Generate passwords
-
-Use strong random passwords — one per role:
+Generate a strong random value for each:
 
 ```bash
 export PG_SUPERUSER_PASSWORD=$(openssl rand -base64 32)
@@ -92,14 +88,9 @@ export PG_APP_PASSWORD=$(openssl rand -base64 32)
 export PG_REPLICATION_PASSWORD=$(openssl rand -base64 32)
 ```
 
-Keep `PG_APP_PASSWORD` — you will need to add it to GitHub Secrets as
-`POSTGRES_PASSWORD` in step 3.
-
-#### 2c. Create the namespace and credentials secret
+Then create the secret:
 
 ```bash
-kubectl create namespace devops-challenge
-
 kubectl create secret generic postgres-credentials \
   --from-literal=postgres-password="$PG_SUPERUSER_PASSWORD" \
   --from-literal=password="$PG_APP_PASSWORD" \
@@ -107,7 +98,12 @@ kubectl create secret generic postgres-credentials \
   -n devops-challenge
 ```
 
-#### 2d. Install the chart
+Save `PG_APP_PASSWORD` — you will need to add it to GitHub Secrets as
+`POSTGRES_PASSWORD` (step 3 below).
+
+#### Step 3 — Install the Postgres chart
+
+Now that the secret exists, the chart can be installed:
 
 ```bash
 helm repo add bitnami https://charts.bitnami.com/bitnami
@@ -118,7 +114,12 @@ helm upgrade --install postgres bitnami/postgresql \
   -n devops-challenge
 ```
 
-Verify it comes up:
+**The Bitnami chart automatically creates the `devops` user and the
+`currencies` database** on first install, using the `password` key from the
+secret and the `username`/`database` values in `helm/postgres/values.yaml`.
+You do not need to create them manually.
+
+Verify the pod comes up:
 
 ```bash
 kubectl get pods -n devops-challenge
