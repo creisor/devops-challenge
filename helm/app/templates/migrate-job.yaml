@@ -26,11 +26,13 @@ spec:
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           command: ["pnpm", "db:migrate:deploy"]
           env:
-            - name: POSTGRES_PRISMA_URL
+            - name: POSTGRES_URI
               valueFrom:
                 secretKeyRef:
-                  name: {{ include "devops-challenge.fullname" . }}-db
-                  key: POSTGRES_PRISMA_URL
+                  name: {{ .Values.cnpg.clusterName }}-app
+                  key: uri
+            - name: POSTGRES_PRISMA_URL
+              value: "$(POSTGRES_URI)?schema=public"
           securityContext:
             allowPrivilegeEscalation: false
             capabilities:

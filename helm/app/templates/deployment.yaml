@@ -31,11 +31,15 @@ spec:
             - containerPort: 3000
               protocol: TCP
           env:
-            - name: POSTGRES_PRISMA_URL
+            # CNPG generates <clusterName>-app secret with a uri key.
+            # Kubernetes env var substitution appends the Prisma schema param.
+            - name: POSTGRES_URI
               valueFrom:
                 secretKeyRef:
-                  name: {{ include "devops-challenge.fullname" . }}-db
-                  key: POSTGRES_PRISMA_URL
+                  name: {{ .Values.cnpg.clusterName }}-app
+                  key: uri
+            - name: POSTGRES_PRISMA_URL
+              value: "$(POSTGRES_URI)?schema=public"
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: false

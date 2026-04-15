@@ -45,7 +45,6 @@ Replace `<traefik-node-ip>` with the LAN IP of the k3s node running Traefik
 |--------|-------------|
 | `KUBECONFIG` | Full kubeconfig pointing directly to the k3s API server LAN IP (`https://<ip>:6443`). Export with: `kubectl config view --raw --minify` |
 | `GHCR_TOKEN` | GitHub PAT with `write:packages` scope |
-| `POSTGRES_PASSWORD` | Password for the `devops` database user — must match the `password` key in the `postgres-credentials` Kubernetes Secret |
 
 ## Cluster Prerequisites
 
@@ -59,10 +58,9 @@ kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/late
 
 ### 2. Bootstrap Postgres (one-time, not managed by CI)
 
-The Bitnami `postgresql` chart references a pre-existing Kubernetes Secret for
-its credentials (`existingSecret: postgres-credentials` in
-`helm/postgres/values.yaml`). **The secret must be created before the chart is
-installed.** Follow these steps in order.
+Postgres is managed by the [CloudNativePG](https://cloudnative-pg.io/)
+operator. The operator creates the `app` user, the `currencies` database, and
+all credentials automatically — no manual secret creation required.
 
 #### Step 1 — Create the namespace
 
@@ -70,58 +68,50 @@ installed.** Follow these steps in order.
 kubectl create namespace devops-challenge
 ```
 
-#### Step 2 — Generate passwords and create the credentials secret
+#### Step 2 — Install the CloudNativePG operator
 
-The secret has three keys, one per Postgres role:
-
-| Key | Role | Used by |
-|-----|------|---------|
-| `postgres-password` | Built-in `postgres` superuser | DBA / admin tasks |
-| `password` | Application user (`devops`) | The Next.js app and migration Job |
-| `replication-password` | Replication standby user | Bitnami chart internals |
-
-Generate a strong random value for each:
+The operator is cluster-scoped and only needs to be installed once:
 
 ```bash
-export PG_SUPERUSER_PASSWORD=$(openssl rand -base64 32)
-export PG_APP_PASSWORD=$(openssl rand -base64 32)
-export PG_REPLICATION_PASSWORD=$(openssl rand -base64 32)
-```
-
-Then create the secret:
-
-```bash
-kubectl create secret generic postgres-credentials \
-  --from-literal=postgres-password="$PG_SUPERUSER_PASSWORD" \
-  --from-literal=password="$PG_APP_PASSWORD" \
-  --from-literal=replication-password="$PG_REPLICATION_PASSWORD" \
-  -n devops-challenge
-```
-
-Save `PG_APP_PASSWORD` — you will need to add it to GitHub Secrets as
-`POSTGRES_PASSWORD` (step 3 below).
-
-#### Step 3 — Install the Postgres chart
-
-Now that the secret exists, the chart can be installed:
-
-```bash
-helm repo add bitnami https://charts.bitnami.com/bitnami
+helm repo add cnpg https://cloudnative-pg.github.io/charts
 helm repo update
 
-helm upgrade --install postgres bitnami/postgresql \
-  -f helm/postgres/values.yaml \
-  -n devops-challenge
+helm upgrade --install cnpg cnpg/cloudnative-pg \
+  --namespace cnpg-system \
+  --create-namespace
 ```
 
-**The Bitnami chart automatically creates the `devops` user and the
-`currencies` database** on first install, using the `password` key from the
-secret and the `username`/`database` values in `helm/postgres/values.yaml`.
-You do not need to create them manually.
-
-Verify the pod comes up:
+Verify the operator is running:
 
 ```bash
+kubectl get pods -n cnpg-system
+# cnpg-cloudnative-pg-* should reach Running/Ready
+```
+
+#### Step 3 — Apply the Cluster manifest
+
+```bash
+kubectl apply -f helm/postgres/cluster.yaml
+```
+
+CNPG will provision a PostgreSQL 17 pod, create the `app` user and
+`currencies` database, and generate credentials automatically. It creates two
+secrets in the `devops-challenge` namespace:
+
+| Secret | Contents |
+|--------|----------|
+| `postgres-app` | Application user credentials + `uri` connection string |
+| `postgres-superuser` | Superuser (`postgres`) credentials |
+
+The app Helm chart references `postgres-app` directly — no manual secret
+management is needed.
+
+Verify the cluster comes up:
+
+```bash
+kubectl get cluster -n devops-challenge
+# postgres cluster should reach "Cluster in healthy state"
+
 kubectl get pods -n devops-challenge
-# postgres-postgresql-0 should reach Running/Ready
+# postgres-1 should reach Running/Ready
 ```

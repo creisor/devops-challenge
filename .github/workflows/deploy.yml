@@ -59,7 +59,6 @@ jobs:
             --namespace devops-challenge \
             --create-namespace \
             --set image.tag=${{ github.sha }} \
-            --set postgres.password=${{ secrets.POSTGRES_PASSWORD }} \
             --wait \
             --timeout 5m
 
