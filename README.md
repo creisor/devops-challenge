@@ -46,3 +46,51 @@ This is a take-home exercise — complete it on your own time and submit when yo
 If you use AI tools to assist with this challenge, please bring the prompts you used to the interview. The interviewers would like to understand how you arrived at your solution.
 
 Good luck! :four_leaf_clover:
+
+---
+
+## Solution Overview
+
+### Containerization
+
+The application is packaged using a three-stage `Dockerfile` (`node:22-alpine`):
+- **deps** — installs production dependencies
+- **builder** — installs all dependencies and runs `next build` with `output: 'standalone'`
+- **runner** — minimal image containing only the standalone output; runs as non-root user (UID 1001)
+
+### Kubernetes Deployment
+
+The app is deployed to a local k3s cluster using two Helm charts:
+
+| Chart | Path | Description |
+|-------|------|-------------|
+| App | `helm/app/` | Deployment, Service, Traefik Ingress, HPA (2–3 replicas), Prisma migration Job hook |
+| Postgres | `helm/postgres/` | Bitnami postgresql chart, StatefulSet with `local-path` PVC |
+
+Prisma migrations run automatically as a Helm `pre-install`/`pre-upgrade` hook before each deploy.
+
+### CI/CD
+
+GitHub Actions (`.github/workflows/deploy.yml`) runs on a **self-hosted runner** on the same LAN as the cluster. On every push to `main`:
+
+1. Builds the Docker image
+2. Scans with Trivy (fails on CRITICAL/HIGH CVEs)
+3. Pushes to GitHub Container Registry (GHCR)
+4. Deploys via `helm upgrade --install`
+5. Runs a `curl`-based smoke test
+
+### Local Access
+
+The cluster is on a private LAN. Use the SSH tunnel script for local access:
+
+```bash
+export SSH_HOST=<k3s-host-ip>
+./scripts/tunnel.sh
+```
+
+Then visit `http://devops-challenge.local:8080`. See [docs/ssh-tunnel.md](docs/ssh-tunnel.md) for full setup.
+
+### Terraform
+
+Terraform was evaluated and determined to be out of scope for this local k3s
+environment. All infrastructure is managed through Helm charts.

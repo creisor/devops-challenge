@@ -1,0 +1,36 @@
+image:
+  repository: ghcr.io/creisor/devops-challenge
+  tag: latest
+  pullPolicy: Always
+
+replicaCount: 2
+
+ingress:
+  host: devops-challenge.local
+
+# Name of the CloudNativePG Cluster resource.
+# CNPG auto-generates a secret named <clusterName>-app containing the
+# application user's credentials and connection URI.
+cnpg:
+  clusterName: postgres
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 256Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi
+
+autoscaling:
+  minReplicas: 2
+  maxReplicas: 3
+  targetCPUUtilizationPercentage: 70
+
+livenessProbe:
+  initialDelaySeconds: 15
+  periodSeconds: 10
+
+readinessProbe:
+  initialDelaySeconds: 10
+  periodSeconds: 5

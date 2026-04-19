@@ -1,0 +1,6 @@
+apiVersion: v2
+name: devops-challenge
+description: MoonPay DevOps Challenge — Next.js crypto prices app
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
