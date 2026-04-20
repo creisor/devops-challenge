@@ -23,18 +23,6 @@
   hosts: ubuntu_host
   become: true
 
-  pre_tasks:
-    - name: Assert required vault variables are defined
-      ansible.builtin.assert:
-        that:
-          - vault_github_runner_token is defined
-          - vault_ghcr_token is defined
-        fail_msg: |
-          Required vault variables are missing. Run the playbook with:
-            ansible-playbook ansible/prerequisites.yml -i ansible/inventory.yml \
-              --extra-vars "@ansible/vault.yml" --ask-vault-pass
-          See ansible/vault.yml.example for the expected structure.
-
   tasks:
     # -------------------------------------------------------------------------
     # Package installation
@@ -94,66 +82,70 @@
 
     # -------------------------------------------------------------------------
     # GitHub Actions self-hosted runner
+    # Skipped when vault_github_runner_token is not provided.
     # -------------------------------------------------------------------------
-    - name: Create runner directory
-      ansible.builtin.file:
-        path: "{{ github_runner_dir }}"
-        state: directory
-        owner: "{{ ansible_user }}"
-        group: "{{ ansible_user }}"
-        mode: "0755"
+    - name: Install and register GitHub Actions runner
+      when: vault_github_runner_token is defined
+      block:
+        - name: Create runner directory
+          ansible.builtin.file:
+            path: "{{ github_runner_dir }}"
+            state: directory
+            owner: "{{ ansible_user }}"
+            group: "{{ ansible_user }}"
+            mode: "0755"
 
-    - name: Get latest runner version
-      ansible.builtin.uri:
-        url: https://api.github.com/repos/actions/runner/releases/latest
-        return_content: true
-      register: runner_release
-      become: false
+        - name: Get latest runner version
+          ansible.builtin.uri:
+            url: https://api.github.com/repos/actions/runner/releases/latest
+            return_content: true
+          register: runner_release
+          become: false
 
-    - name: Set runner version fact
-      ansible.builtin.set_fact:
-        runner_version: "{{ (runner_release.content | from_json).tag_name | regex_replace('^v', '') }}"
+        - name: Set runner version fact
+          ansible.builtin.set_fact:
+            runner_version: "{{ (runner_release.content | from_json).tag_name | regex_replace('^v', '') }}"
 
-    - name: Download runner tarball
-      ansible.builtin.get_url:
-        url: "https://github.com/actions/runner/releases/download/v{{ runner_version }}/actions-runner-linux-x64-{{ runner_version }}.tar.gz"
-        dest: "/tmp/actions-runner.tar.gz"
-        mode: "0644"
+        - name: Download runner tarball
+          ansible.builtin.get_url:
+            url: "https://github.com/actions/runner/releases/download/v{{ runner_version }}/actions-runner-linux-x64-{{ runner_version }}.tar.gz"
+            dest: "/tmp/actions-runner.tar.gz"
+            mode: "0644"
 
-    - name: Extract runner tarball
-      ansible.builtin.unarchive:
-        src: /tmp/actions-runner.tar.gz
-        dest: "{{ github_runner_dir }}"
-        remote_src: true
-        owner: "{{ ansible_user }}"
-        group: "{{ ansible_user }}"
-        creates: "{{ github_runner_dir }}/config.sh"
+        - name: Extract runner tarball
+          ansible.builtin.unarchive:
+            src: /tmp/actions-runner.tar.gz
+            dest: "{{ github_runner_dir }}"
+            remote_src: true
+            owner: "{{ ansible_user }}"
+            group: "{{ ansible_user }}"
+            creates: "{{ github_runner_dir }}/config.sh"
 
-    - name: Configure runner
-      ansible.builtin.command: >
-        ./config.sh
-        --url {{ github_repo_url }}
-        --token {{ github_runner_token }}
-        --unattended
-        --replace
-      args:
-        chdir: "{{ github_runner_dir }}"
-      become: false
-      become_user: "{{ ansible_user }}"
+        - name: Configure runner
+          ansible.builtin.command: >
+            ./config.sh
+            --url {{ github_repo_url }}
+            --token {{ github_runner_token }}
+            --unattended
+            --replace
+          args:
+            chdir: "{{ github_runner_dir }}"
+          become: false
+          become_user: "{{ ansible_user }}"
 
-    - name: Install runner as systemd service
-      ansible.builtin.command: ./svc.sh install {{ ansible_user }}
-      args:
-        chdir: "{{ github_runner_dir }}"
-      register: svc_install
-      changed_when: "'Installing' in svc_install.stdout"
+        - name: Install runner as systemd service
+          ansible.builtin.command: ./svc.sh install {{ ansible_user }}
+          args:
+            chdir: "{{ github_runner_dir }}"
+          register: svc_install
+          changed_when: "'Installing' in svc_install.stdout"
 
-    - name: Start runner service
-      ansible.builtin.command: ./svc.sh start
-      args:
-        chdir: "{{ github_runner_dir }}"
-      register: svc_start
-      changed_when: "'Starting' in svc_start.stdout"
+        - name: Start runner service
+          ansible.builtin.command: ./svc.sh start
+          args:
+            chdir: "{{ github_runner_dir }}"
+          register: svc_start
+          changed_when: "'Starting' in svc_start.stdout"
 
 ###############################################################################
 # Play 2 — k3s worker nodes
