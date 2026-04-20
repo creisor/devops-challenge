@@ -19,6 +19,19 @@ all:
       ansible_user: creisor           # SSH user with sudo access
       # ansible_ssh_private_key_file: ~/.ssh/id_ed25519  # uncomment if needed
 
+  children:
+    k3s_workers:
+      hosts:
+        k3s-worker1:
+          ansible_host: 192.168.122.11
+          ansible_user: ubuntu
+        k3s-worker2:
+          ansible_host: 192.168.122.12
+          ansible_user: ubuntu
+        k3s-worker3:
+          ansible_host: 192.168.122.13
+          ansible_user: ubuntu
+
   vars:
     # GitHub Actions runner
     github_repo_url: https://github.com/creisor/devops-challenge   # e.g. https://github.com/acme/devops-challenge

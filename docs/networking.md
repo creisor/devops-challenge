@@ -62,6 +62,98 @@ virsh domifaddr k3s-control   # check current IP
 # If not yet updated, restart the VM's network interface or reboot the VM
 ```
 
+## Ubuntu Host — Static LAN IP (Recommended)
+
+The Ubuntu host's LAN IP is the gateway for all Macbook → cluster traffic. If
+it changes (DHCP lease renewal, reboot, etc.) the static route on the Macbook
+breaks and several config files need updating. Assign it a static IP to avoid
+this.
+
+**Option A — Router DHCP reservation (easiest)**
+
+Find the Ubuntu host's LAN MAC address:
+
+```bash
+ip link show | grep -A1 "state UP" | grep link/ether
+```
+
+Add a DHCP reservation in your router's admin UI mapping that MAC to a fixed IP
+(e.g. `192.168.0.196`). The host will always get the same IP from DHCP without
+any OS-level changes.
+
+**Option B — Netplan static IP on the Ubuntu host**
+
+Edit `/etc/netplan/01-network-manager-all.yaml` (or whichever file configures
+the LAN interface):
+
+```yaml
+network:
+  version: 2
+  ethernets:
+    <interface>:          # e.g. enp0s31f6 — check with: ip link show
+      dhcp4: no
+      addresses: [192.168.0.196/24]
+      routes:
+        - to: default
+          via: 192.168.0.1   # your router's IP
+      nameservers:
+        addresses: [8.8.8.8, 1.1.1.1]
+```
+
+Apply: `sudo netplan apply`
+
+---
+
+## Ubuntu Host IP Changed — Recovery Steps
+
+If the Ubuntu host's LAN IP changes despite the above, here is what to update:
+
+**1. Update the Mac static route**
+
+```bash
+# Remove the old route (substitute the old IP)
+sudo route delete -net 192.168.122.0/24 <old-ubuntu-ip>
+
+# Add the new route
+sudo route add -net 192.168.122.0/24 <new-ubuntu-ip>
+```
+
+Also update the LaunchDaemon plist at
+`/Library/LaunchDaemons/net.192-168-122.route.plist` — replace the old IP with
+the new one in the `ProgramArguments` array, then reload:
+
+```bash
+sudo launchctl unload /Library/LaunchDaemons/net.192-168-122.route.plist
+sudo launchctl load  /Library/LaunchDaemons/net.192-168-122.route.plist
+```
+
+**2. Update ansible/inventory.yml**
+
+Change the `ansible_host` value for `ubuntu_host` to the new IP:
+
+```yaml
+ubuntu_host:
+  ansible_host: <new-ubuntu-ip>
+```
+
+**3. Verify the libvirt iptables FORWARD rule**
+
+The rule that allows Macbook → VM traffic is scoped to `192.168.0.0/24` (the
+subnet, not a specific host IP), so it survives an IP change within the same
+/24. Confirm it is still present:
+
+```bash
+sudo iptables -L LIBVIRT_FWI -n -v | grep "192.168.0.0"
+```
+
+If missing, re-add it (see the libvirt hook setup below in this doc).
+
+**Nothing else changes** — the kubeconfig, GitHub Actions secrets, and k3s
+configuration all reference `192.168.122.10` (the k3s-control static libvirt
+IP), which is independent of the Ubuntu host's LAN IP.
+
+---
+
 ## Macbook — Static Route Setup
 
 Once static IPs are assigned, add a route on your Macbook so that traffic to
@@ -118,6 +210,43 @@ Replace `<ubuntu-host-ip>` with your Ubuntu host's LAN IP.
 
 ```bash
 sudo launchctl load /Library/LaunchDaemons/net.192-168-122.route.plist
+```
+
+## Ubuntu Host — libvirt iptables Forward Rule
+
+By default, libvirt's iptables rules block new connections initiated from
+outside the NAT network (only allowing return traffic). To allow the Macbook to
+reach the VMs directly, one additional rule is needed and must survive libvirt
+restarts.
+
+**Add the rule now:**
+
+```bash
+sudo iptables -I LIBVIRT_FWI 1 \
+  -d 192.168.122.0/24 -o virbr0 \
+  -s 192.168.0.0/24 -j ACCEPT
+```
+
+**Make it persistent via a libvirt network hook** (re-applied whenever the
+`default` network starts):
+
+```bash
+sudo mkdir -p /etc/libvirt/hooks
+sudo tee /etc/libvirt/hooks/network << 'EOF'
+#!/bin/bash
+if [ "$1" = "default" ] && [ "$2" = "started" ]; then
+    iptables -I LIBVIRT_FWI 1 \
+      -d 192.168.122.0/24 -o virbr0 \
+      -s 192.168.0.0/24 -j ACCEPT
+fi
+EOF
+sudo chmod +x /etc/libvirt/hooks/network
+```
+
+Verify the rule is present after a reboot or `virsh net-destroy/start default`:
+
+```bash
+sudo iptables -L LIBVIRT_FWI -n -v | grep "192.168.0.0"
 ```
 
 ## Macbook — /etc/hosts
