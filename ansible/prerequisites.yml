@@ -23,6 +23,18 @@
   hosts: ubuntu_host
   become: true
 
+  pre_tasks:
+    - name: Assert required vault variables are defined
+      ansible.builtin.assert:
+        that:
+          - vault_github_runner_token is defined
+          - vault_ghcr_token is defined
+        fail_msg: |
+          Required vault variables are missing. Run the playbook with:
+            ansible-playbook ansible/prerequisites.yml -i ansible/inventory.yml \
+              --extra-vars "@ansible/vault.yml" --ask-vault-pass
+          See ansible/vault.yml.example for the expected structure.
+
   tasks:
     # -------------------------------------------------------------------------
     # Package installation
