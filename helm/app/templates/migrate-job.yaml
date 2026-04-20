@@ -20,6 +20,8 @@ spec:
       securityContext:
         runAsNonRoot: true
         runAsUser: 1001
+      imagePullSecrets:
+        - name: ghcr-secret
       containers:
         - name: migrate
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
