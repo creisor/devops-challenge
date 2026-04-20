@@ -64,4 +64,6 @@ jobs:
             --timeout 5m
 
       - name: Smoke test
-        run: ./scripts/smoke-test.sh
+        run: |
+          K3S_IP=$(virsh domifaddr k3s-control | awk '/ipv4/ {print $4}' | cut -d/ -f1)
+          BASE_URL="http://${K3S_IP}" HOST_HEADER="devops-challenge.local" ./scripts/smoke-test.sh
