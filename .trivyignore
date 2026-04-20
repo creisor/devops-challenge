@@ -5,3 +5,33 @@
 # to the latest available release (16.2.3). This finding will be resolved
 # automatically when Next.js ships an updated compiled bundle.
 CVE-2026-33671
+
+# The following 10 CVEs are in transitive dependencies of devDependency toolchain
+# packages (ESLint, Prisma CLI, Turbo) that land in the image because the full
+# node_modules is copied to make `prisma migrate deploy` available at runtime.
+# None of these packages are invoked by the web server's request path; they are
+# only present to support the Helm pre-upgrade migration Job.
+#
+# @hono/node-server (transitive dep of @eslint/plugin-kit)
+CVE-2026-29087
+#
+# defu (transitive dep of Nuxt/build tooling pulled in by Turbo or Prisma CLI)
+CVE-2026-35209
+#
+# effect (used internally by Prisma 7 CLI)
+CVE-2026-32887
+#
+# flatted (transitive dep of ESLint flat config)
+CVE-2026-32141
+CVE-2026-33228
+#
+# hono (transitive dep of @eslint/plugin-kit via @hono/node-server)
+CVE-2026-29045
+#
+# lodash (transitive dep of build tooling; lodash 4.18.0 is not yet published)
+CVE-2026-4800
+#
+# minimatch (transitive dep of glob/eslint; affects vendored copies at 3.1.2 and 9.0.5)
+CVE-2026-26996
+CVE-2026-27903
+CVE-2026-27904
