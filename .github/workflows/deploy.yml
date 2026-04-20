@@ -19,6 +19,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Connect to Tailscale
+        uses: tailscale/tailscale-github-action@v2
+        with:
+          authkey: ${{ secrets.TAILSCALE_AUTHKEY }}
+
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
         with:
