@@ -65,7 +65,7 @@ The app is deployed to a local k3s cluster using two Helm charts:
 | Chart | Path | Description |
 |-------|------|-------------|
 | App | `helm/app/` | Deployment, Service, Traefik Ingress, HPA (2–3 replicas), Prisma migration Job hook |
-| Postgres | `helm/postgres/` | Bitnami postgresql chart, StatefulSet with `local-path` PVC |
+| Postgres | `helm/postgres/` | CloudNativePG `Cluster` manifest; operator manages the StatefulSet with `local-path` PVC |
 
 Prisma migrations run automatically as a Helm `pre-install`/`pre-upgrade` hook before each deploy.
 
@@ -81,14 +81,15 @@ GitHub Actions (`.github/workflows/deploy.yml`) runs on a **self-hosted runner**
 
 ### Local Access
 
-The cluster is on a private LAN. Use the SSH tunnel script for local access:
+The cluster is on a private libvirt NAT network (`192.168.122.0/24`). Add a static route on your Macbook so traffic to that subnet is forwarded through the Ubuntu host:
 
 ```bash
-export SSH_HOST=<k3s-host-ip>
-./scripts/tunnel.sh
+sudo route add -net 192.168.122.0/24 <ubuntu-host-ip>
 ```
 
-Then visit `http://devops-challenge.local:8080`. See [docs/ssh-tunnel.md](docs/ssh-tunnel.md) for full setup.
+Add `192.168.122.10  devops-challenge.local` to `/etc/hosts`, then visit `http://devops-challenge.local`.
+
+See [docs/networking.md](docs/networking.md) for full setup, persistent route config, and the required libvirt iptables rule. An SSH tunnel fallback is documented in [docs/ssh-tunnel.md](docs/ssh-tunnel.md).
 
 ### Terraform
 
