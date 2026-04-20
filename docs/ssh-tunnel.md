@@ -1,33 +1,39 @@
 # SSH Tunnel — Local Developer Access
 
-The k3s cluster runs on a separate laptop on a private LAN (libvirt NAT) and
-is not directly reachable from the developer's machine. This document explains
-how to set up an SSH tunnel for local access and demo use.
+The k3s cluster runs inside a libvirt VM on an Ubuntu host. The VM's network
+is on a private NAT (e.g. `192.168.122.0/24`) that is not directly reachable
+from the developer's laptop. This document explains how to set up an SSH tunnel
+through the Ubuntu host to reach the k3s VM.
 
 ## Network Topology
 
 ```
 Developer laptop
   │
-  │  SSH tunnel (port-forward)
+  │  SSH tunnel (port-forward through Ubuntu host)
   ▼
-k3s host machine  ──►  k3s cluster (Traefik / API server)
+Ubuntu host  ──►  k3s VM (Traefik / API server)
+                  (libvirt NAT, e.g. 192.168.122.x)
 ```
 
 ## Port Mapping
 
-| Local port | Remote port | Purpose |
+| Local port | Destination | Purpose |
 |------------|-------------|---------|
-| `8080` | `80` | Traefik ingress (port 80 requires root so 8080 is used) |
-| `6443` | `6443` | k3s API server (skipped if already forwarded) |
+| `8080` | `k3s-vm:80` | Traefik ingress (tunnelled via Ubuntu host) |
+| `6443` | `k3s-vm:6443` | k3s API server (skipped if already forwarded) |
 
 ## Opening the Tunnel
 
 ```bash
-export SSH_HOST=<k3s-host-ip>
+export SSH_HOST=<ubuntu-host-ip>
 export SSH_USER=<your-username>
 ./scripts/tunnel.sh
 ```
+
+The script SSHes to the Ubuntu host, detects the k3s VM's libvirt IP
+automatically via `virsh domifaddr k3s-control`, then sets up the forwards.
+You can override the auto-detected IP with `K3S_VM_IP=<ip>` if needed.
 
 The script runs in the foreground. Press `Ctrl+C` to close it.
 
