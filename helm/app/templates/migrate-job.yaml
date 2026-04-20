@@ -23,6 +23,8 @@ spec:
       containers:
         - name: migrate
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullSecrets:
+            - name: ghcr-secret
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           command: ["pnpm", "db:migrate:deploy"]
           env:
