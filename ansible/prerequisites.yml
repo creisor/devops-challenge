@@ -35,26 +35,26 @@
     - name: Install required packages
       ansible.builtin.apt:
         name:
-          - docker.io
+          # - docker.io
           - curl
           - libvirt-clients   # provides virsh
         state: present
 
-    - name: Install kubectl
-      ansible.builtin.shell: |
-        set -e
-        KUBECTL_VERSION=$(curl -sL https://dl.k8s.io/release/stable.txt)
-        curl -sLo /usr/local/bin/kubectl \
-          "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl"
-        chmod +x /usr/local/bin/kubectl
-      args:
-        creates: /usr/local/bin/kubectl
-
-    - name: Install helm
-      ansible.builtin.shell: |
-        curl -fsSL https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
-      args:
-        creates: /usr/local/bin/helm
+    # - name: Install kubectl
+    #   ansible.builtin.shell: |
+    #     set -e
+    #     KUBECTL_VERSION=$(curl -sL https://dl.k8s.io/release/stable.txt)
+    #     curl -sLo /usr/local/bin/kubectl \
+    #       "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl"
+    #     chmod +x /usr/local/bin/kubectl
+    #   args:
+    #     creates: /usr/local/bin/kubectl
+    #
+    # - name: Install helm
+    #   ansible.builtin.shell: |
+    #     curl -fsSL https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+    #   args:
+    #     creates: /usr/local/bin/helm
 
     - name: Add runner user to docker group
       ansible.builtin.user:
@@ -66,14 +66,14 @@
     # libvirt DHCP reservations — static IPs for k3s VMs
     # -------------------------------------------------------------------------
     - name: Check existing libvirt DHCP reservations
-      ansible.builtin.command: virsh net-dumpxml default
+      ansible.builtin.command: virsh -c qemu:///system net-dumpxml default
       register: libvirt_net_xml
       changed_when: false
       become: false
 
     - name: Add DHCP host reservation for each k3s VM
       ansible.builtin.command: >
-        virsh net-update default add ip-dhcp-host
+        virsh -c qemu:///system net-update default add ip-dhcp-host
         "<host mac='{{ item.mac }}' name='{{ item.name }}' ip='{{ item.ip }}'/>"
         --live --config
       loop: "{{ k3s_vms }}"
