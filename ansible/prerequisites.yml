@@ -1,10 +1,12 @@
 ---
 # prerequisites.yml — One-time deployment prerequisite setup for devops-challenge.
 #
-# This playbook has two plays:
+# This playbook has three plays:
 #   1. Ubuntu host play  — installs tools, sets VM static IPs, registers the
 #                          GitHub Actions runner.
-#   2. k3s cluster play  — creates the namespace, GHCR pull secret, installs
+#   2. k3s workers play  — adds /etc/hosts entry so workers resolve k3s-control
+#                          by hostname rather than IP.
+#   3. k3s cluster play  — creates the namespace, GHCR pull secret, installs
 #                          CloudNativePG, bootstraps Postgres, and installs
 #                          metrics-server.
 #
@@ -142,7 +144,26 @@
       changed_when: "'Starting' in svc_start.stdout"
 
 ###############################################################################
-# Play 2 — k3s cluster prerequisites
+# Play 2 — k3s worker nodes
+#
+# Adds a /etc/hosts entry so workers resolve k3s-control by hostname.
+# libvirt's dnsmasq resolves the name correctly from the Ubuntu host but
+# systemd-resolved on the worker VMs does not forward to it by default.
+###############################################################################
+- name: k3s workers — /etc/hosts entry for control plane hostname
+  hosts: k3s_workers
+  become: true
+
+  tasks:
+    - name: Ensure k3s-control resolves to static IP via /etc/hosts
+      ansible.builtin.lineinfile:
+        path: /etc/hosts
+        regexp: '.*\bk3s-control\b'
+        line: "{{ k3s_control_ip }}  k3s-control"
+        state: present
+
+###############################################################################
+# Play 3 — k3s cluster prerequisites
 #
 # Runs on the ubuntu_host but targets the k3s cluster via KUBECONFIG.
 # Requires kubectl, helm, and network access to 192.168.122.10:6443.
