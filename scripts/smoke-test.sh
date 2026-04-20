@@ -5,16 +5,16 @@
 #   ./scripts/smoke-test.sh
 #
 # Environment variables:
-#   BASE_URL     — Base URL to test (default: http://devops-challenge.local:8080)
+#   BASE_URL     — Base URL to test (default: http://devops-challenge.local)
 #   HOST_HEADER  — Optional Host header override. Use when BASE_URL is an IP
 #                  address so Traefik can route to the correct ingress.
 #                  Example: HOST_HEADER=devops-challenge.local BASE_URL=http://192.168.122.10
 
 set -euo pipefail
 
-BASE_URL="${BASE_URL:-http://devops-challenge.local:8080}"
+BASE_URL="${BASE_URL:-http://devops-challenge.local}"
 HOST_HEADER="${HOST_HEADER:-}"
-EXPECTED="Latest Crypto Prices"
+EXPECTED="LatestPrices"
 
 CURL_OPTS=(-s -o /tmp/smoke-response.html -w "%{http_code}")
 [[ -n "$HOST_HEADER" ]] && CURL_OPTS+=(-H "Host: ${HOST_HEADER}")
