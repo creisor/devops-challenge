@@ -45,17 +45,30 @@ ENV NODE_ENV=production
 ENV PORT=3000
 
 # Upgrade Alpine packages to pick up latest security patches, then create non-root user
+# Enable pnpm via corepack so the migration job can run `pnpm db:migrate:deploy`
 RUN apk upgrade --no-cache && \
     addgroup --system --gid 1001 nodejs && \
-    adduser  --system --uid 1001 nextjs
+    adduser  --system --uid 1001 nextjs && \
+    corepack enable pnpm
 
-# Copy standalone output
+# Copy standalone output (server.js + minimal node_modules)
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 COPY --from=builder --chown=nextjs:nodejs /app/public ./public
 
-# Prisma generated client is not included in standalone output — copy explicitly
-COPY --from=builder --chown=nextjs:nodejs /app/prisma/generated ./prisma/generated
+# Replace standalone's minimal node_modules with the full builder set so the
+# prisma CLI (devDependency) is available for `pnpm db:migrate:deploy`
+COPY --from=builder --chown=nextjs:nodejs /app/node_modules ./node_modules
+
+# package.json is required for pnpm to resolve script definitions
+COPY --from=builder --chown=nextjs:nodejs /app/package.json ./package.json
+
+# Full prisma directory: generated client, schema.prisma, and migrations/
+# (prisma migrate deploy needs schema.prisma + migrations to run)
+COPY --from=builder --chown=nextjs:nodejs /app/prisma ./prisma
+
+# prisma.config.ts is read by the Prisma CLI at runtime to resolve the datasource URL
+COPY --from=builder --chown=nextjs:nodejs /app/prisma.config.ts ./prisma.config.ts
 
 USER nextjs
 
