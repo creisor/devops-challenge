@@ -34,7 +34,9 @@ The Ansible playbook (`ansible/prerequisites.yml`) installs all of these.
    ```
 
 > The Ansible playbook handles steps 2 and 3 automatically when
-> `github_runner_token` is provided.
+> `vault_github_runner_token` is set in `ansible/vault.yml`. Note: the
+> registration token expires after **1 hour** — generate a fresh one
+> immediately before running the playbook.
 
 ## Required Repository Secrets
 

@@ -41,3 +41,6 @@ yarn-error.log*
 prisma/generated
 .pnpm-store
 worktrees/
+
+# Ansible Vault secrets — never commit the live vault file
+ansible/vault.yml
