@@ -8,7 +8,7 @@
 #   BASE_URL     — Base URL to test (default: http://devops-challenge.local:8080)
 #   HOST_HEADER  — Optional Host header override. Use when BASE_URL is an IP
 #                  address so Traefik can route to the correct ingress.
-#                  Example: HOST_HEADER=devops-challenge.local BASE_URL=http://192.168.122.80
+#                  Example: HOST_HEADER=devops-challenge.local BASE_URL=http://192.168.122.10
 
 set -euo pipefail
 

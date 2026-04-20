@@ -1,0 +1,49 @@
+---
+# Ansible inventory for devops-challenge deployment prerequisites.
+#
+# Sensitive variables (ghcr_token, github_runner_token) are stored in an
+# Ansible Vault file at ansible/vault.yml — never committed to git.
+# See ansible/vault.yml.example for the expected structure.
+#
+# Usage:
+#   ansible-playbook ansible/prerequisites.yml -i ansible/inventory.yml \
+#     --extra-vars "@ansible/vault.yml" --ask-vault-pass
+#
+# Required collections:
+#   ansible-galaxy collection install community.general kubernetes.core
+
+all:
+  hosts:
+    ubuntu_host:
+      ansible_host: 192.168.0.196     # LAN IP of the Ubuntu machine
+      ansible_user: creisor           # SSH user with sudo access
+      # ansible_ssh_private_key_file: ~/.ssh/id_ed25519  # uncomment if needed
+
+  vars:
+    # GitHub Actions runner
+    github_repo_url: https://github.com/creisor/devops-challenge   # e.g. https://github.com/acme/devops-challenge
+    github_runner_token: "{{ vault_github_runner_token }}"   # set in ansible/vault.yml
+    github_runner_dir: /home/creisor/actions-runner
+
+    # GitHub Container Registry
+    ghcr_username: creisor
+    ghcr_token: "{{ vault_ghcr_token }}"   # set in ansible/vault.yml
+
+    # k3s VM static IP assignments (must match virsh net-update reservations)
+    k3s_vms:
+      - name: k3s-control
+        mac: 52:54:00:a1:56:f0  # virsh dumpxml k3s-control | grep 'mac address'
+        ip: 192.168.122.10
+      - name: k3s-worker1
+        mac: 52:54:00:42:da:c7
+        ip: 192.168.122.11
+      - name: k3s-worker2
+        mac: 52:54:00:0f:0a:59
+        ip: 192.168.122.12
+      - name: k3s-worker3
+        mac: 52:54:00:0d:76:6b
+        ip: 192.168.122.13
+
+    # Kubernetes
+    k3s_control_ip: 192.168.122.10
+    kubeconfig_path: /etc/rancher/k3s/k3s.yaml   # path on the Ubuntu host (copied from k3s-control)

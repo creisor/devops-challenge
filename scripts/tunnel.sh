@@ -1,42 +1,33 @@
 #!/usr/bin/env bash
-# tunnel.sh — Open an SSH tunnel to the k3s host for local developer access.
+# tunnel.sh — Open an SSH tunnel to the k3s cluster (fallback access method).
+#
+# NOTE: The preferred access method from a Macbook is a static route — no
+# foreground process required. See docs/networking.md for setup instructions.
+# Use this tunnel only when a static route is not possible.
 #
 # Forwards:
-#   localhost:8080  →  k3s-vm:80    (Traefik ingress; tunnelled via the Ubuntu host)
-#   localhost:6443  →  k3s-vm:6443  (k3s API server; skipped if already open)
-#
-# The k3s cluster runs inside a libvirt VM on the Ubuntu host. The VM's IP is
-# discovered automatically via `virsh domifaddr k3s-control` on the Ubuntu host.
+#   localhost:8080  →  k3s-control:80    (Traefik ingress)
+#   localhost:6443  →  k3s-control:6443  (k3s API server; skipped if already open)
 #
 # Usage:
-#   SSH_HOST=<ubuntu-host> SSH_USER=<user> ./scripts/tunnel.sh
+#   SSH_HOST=<ubuntu-host> SSH_USER=<user> K3S_VM_IP=192.168.122.10 ./scripts/tunnel.sh
 #
 # Environment variables:
 #   SSH_HOST   — hostname or IP of the Ubuntu host machine (required)
 #   SSH_USER   — SSH username on the Ubuntu host (default: current user)
-#   K3S_VM_IP  — override the auto-detected libvirt IP of the k3s VM (optional)
+#   K3S_VM_IP  — IP of the k3s-control node (default: 192.168.122.10; see docs/networking.md)
 
 set -euo pipefail
 
 SSH_HOST="${SSH_HOST:?SSH_HOST must be set to the Ubuntu host IP or hostname}"
 SSH_USER="${SSH_USER:-$(whoami)}"
+K3S_VM_IP="${K3S_VM_IP:-192.168.122.10}"
 
-# Discover the k3s VM's libvirt IP from the Ubuntu host unless overridden
-if [[ -z "${K3S_VM_IP:-}" ]]; then
-  echo "Detecting k3s VM IP via virsh on ${SSH_HOST}..."
-  K3S_VM_IP=$(ssh "${SSH_USER}@${SSH_HOST}" \
-    "virsh domifaddr k3s-control | awk '/ipv4/ {print \$4}' | cut -d/ -f1")
-  if [[ -z "$K3S_VM_IP" ]]; then
-    echo "ERROR: could not detect k3s VM IP. Is the k3s-control VM running?" >&2
-    echo "You can override by setting K3S_VM_IP=<ip> before running this script." >&2
-    exit 1
-  fi
-fi
 echo "k3s VM IP: ${K3S_VM_IP}"
 
 FORWARDS=()
 
-# Forward Traefik ingress: local 8080 → k3s VM port 80 (via Ubuntu host)
+# Forward Traefik ingress: local 8080 → k3s-control port 80 (via Ubuntu host)
 FORWARDS+=("-L" "8080:${K3S_VM_IP}:80")
 
 # Only forward the k3s API port if it is not already in use locally

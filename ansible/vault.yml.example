@@ -1,0 +1,24 @@
+---
+# ansible/vault.yml — Ansible Vault secrets file.
+#
+# Copy this file to ansible/vault.yml, fill in the values, then encrypt it:
+#
+#   cp ansible/vault.yml.example ansible/vault.yml
+#   ansible-vault encrypt ansible/vault.yml
+#
+# To edit an already-encrypted vault:
+#   ansible-vault edit ansible/vault.yml
+#
+# To run the playbook with the vault:
+#   ansible-playbook ansible/prerequisites.yml -i ansible/inventory.yml \
+#     --extra-vars "@ansible/vault.yml" --ask-vault-pass
+#
+# ansible/vault.yml is gitignored and must never be committed.
+
+# GitHub PAT with write:packages scope (same value as the GHCR_TOKEN repo secret)
+vault_ghcr_token: <github-pat-write-packages>
+
+# Runner registration token from Settings → Actions → Runners → New runner
+# Note: this token expires after 1 hour. Generate a fresh one immediately
+# before running the playbook.
+vault_github_runner_token: <runner-registration-token>
