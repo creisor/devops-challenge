@@ -1,0 +1,215 @@
+---
+# prerequisites.yml — One-time deployment prerequisite setup for devops-challenge.
+#
+# This playbook has two plays:
+#   1. Ubuntu host play  — installs tools, sets VM static IPs, registers the
+#                          GitHub Actions runner.
+#   2. k3s cluster play  — creates the namespace, GHCR pull secret, installs
+#                          CloudNativePG, bootstraps Postgres, and installs
+#                          metrics-server.
+#
+# Usage:
+#   ansible-playbook ansible/prerequisites.yml -i ansible/inventory.yml
+#
+# Required collections:
+#   ansible-galaxy collection install community.general kubernetes.core
+
+###############################################################################
+# Play 1 — Ubuntu host setup
+###############################################################################
+- name: Ubuntu host — tools, VM networking, and GitHub Actions runner
+  hosts: ubuntu_host
+  become: true
+
+  tasks:
+    # -------------------------------------------------------------------------
+    # Package installation
+    # -------------------------------------------------------------------------
+    - name: Update apt cache
+      ansible.builtin.apt:
+        update_cache: true
+        cache_valid_time: 3600
+
+    - name: Install required packages
+      ansible.builtin.apt:
+        name:
+          - docker.io
+          - curl
+          - libvirt-clients   # provides virsh
+        state: present
+
+    - name: Install kubectl
+      ansible.builtin.shell: |
+        set -e
+        KUBECTL_VERSION=$(curl -sL https://dl.k8s.io/release/stable.txt)
+        curl -sLo /usr/local/bin/kubectl \
+          "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl"
+        chmod +x /usr/local/bin/kubectl
+      args:
+        creates: /usr/local/bin/kubectl
+
+    - name: Install helm
+      ansible.builtin.shell: |
+        curl -fsSL https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+      args:
+        creates: /usr/local/bin/helm
+
+    - name: Add runner user to docker group
+      ansible.builtin.user:
+        name: "{{ ansible_user }}"
+        groups: docker
+        append: true
+
+    # -------------------------------------------------------------------------
+    # libvirt DHCP reservations — static IPs for k3s VMs
+    # -------------------------------------------------------------------------
+    - name: Check existing libvirt DHCP reservations
+      ansible.builtin.command: virsh net-dumpxml default
+      register: libvirt_net_xml
+      changed_when: false
+      become: false
+
+    - name: Add DHCP host reservation for each k3s VM
+      ansible.builtin.command: >
+        virsh net-update default add ip-dhcp-host
+        "<host mac='{{ item.mac }}' name='{{ item.name }}' ip='{{ item.ip }}'/>"
+        --live --config
+      loop: "{{ k3s_vms }}"
+      when: item.mac not in libvirt_net_xml.stdout
+      become: false
+
+    # -------------------------------------------------------------------------
+    # GitHub Actions self-hosted runner
+    # -------------------------------------------------------------------------
+    - name: Create runner directory
+      ansible.builtin.file:
+        path: "{{ github_runner_dir }}"
+        state: directory
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+        mode: "0755"
+
+    - name: Get latest runner version
+      ansible.builtin.uri:
+        url: https://api.github.com/repos/actions/runner/releases/latest
+        return_content: true
+      register: runner_release
+      become: false
+
+    - name: Set runner version fact
+      ansible.builtin.set_fact:
+        runner_version: "{{ (runner_release.content | from_json).tag_name | regex_replace('^v', '') }}"
+
+    - name: Download runner tarball
+      ansible.builtin.get_url:
+        url: "https://github.com/actions/runner/releases/download/v{{ runner_version }}/actions-runner-linux-x64-{{ runner_version }}.tar.gz"
+        dest: "/tmp/actions-runner.tar.gz"
+        mode: "0644"
+
+    - name: Extract runner tarball
+      ansible.builtin.unarchive:
+        src: /tmp/actions-runner.tar.gz
+        dest: "{{ github_runner_dir }}"
+        remote_src: true
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+        creates: "{{ github_runner_dir }}/config.sh"
+
+    - name: Configure runner
+      ansible.builtin.command: >
+        ./config.sh
+        --url {{ github_repo_url }}
+        --token {{ github_runner_token }}
+        --unattended
+        --replace
+      args:
+        chdir: "{{ github_runner_dir }}"
+      become: false
+      become_user: "{{ ansible_user }}"
+
+    - name: Install runner as systemd service
+      ansible.builtin.command: ./svc.sh install {{ ansible_user }}
+      args:
+        chdir: "{{ github_runner_dir }}"
+      register: svc_install
+      changed_when: "'Installing' in svc_install.stdout"
+
+    - name: Start runner service
+      ansible.builtin.command: ./svc.sh start
+      args:
+        chdir: "{{ github_runner_dir }}"
+      register: svc_start
+      changed_when: "'Starting' in svc_start.stdout"
+
+###############################################################################
+# Play 2 — k3s cluster prerequisites
+#
+# Runs on the ubuntu_host but targets the k3s cluster via KUBECONFIG.
+# Requires kubectl, helm, and network access to 192.168.122.10:6443.
+###############################################################################
+- name: k3s cluster — namespace, secrets, operators, and Postgres
+  hosts: ubuntu_host
+  become: false
+
+  environment:
+    KUBECONFIG: "{{ kubeconfig_path }}"
+
+  tasks:
+    # -------------------------------------------------------------------------
+    # Namespace
+    # -------------------------------------------------------------------------
+    - name: Create devops-challenge namespace
+      kubernetes.core.k8s:
+        api_version: v1
+        kind: Namespace
+        name: devops-challenge
+        state: present
+
+    # -------------------------------------------------------------------------
+    # GHCR image pull secret
+    # -------------------------------------------------------------------------
+    - name: Create GHCR image pull secret
+      kubernetes.core.k8s:
+        state: present
+        definition:
+          apiVersion: v1
+          kind: Secret
+          metadata:
+            name: ghcr-secret
+            namespace: devops-challenge
+          type: kubernetes.io/dockerconfigjson
+          data:
+            .dockerconfigjson: "{{ {'auths': {'ghcr.io': {'username': ghcr_username, 'password': ghcr_token, 'auth': (ghcr_username + ':' + ghcr_token) | b64encode}}} | to_json | b64encode }}"
+
+    # -------------------------------------------------------------------------
+    # CloudNativePG operator
+    # -------------------------------------------------------------------------
+    - name: Add CloudNativePG Helm repo
+      kubernetes.core.helm_repository:
+        name: cnpg
+        repo_url: https://cloudnative-pg.github.io/charts
+
+    - name: Install CloudNativePG operator
+      kubernetes.core.helm:
+        name: cnpg
+        chart_ref: cnpg/cloudnative-pg
+        release_namespace: cnpg-system
+        create_namespace: true
+        wait: true
+        wait_timeout: 5m
+
+    # -------------------------------------------------------------------------
+    # PostgreSQL cluster
+    # -------------------------------------------------------------------------
+    - name: Apply PostgreSQL cluster manifest
+      kubernetes.core.k8s:
+        state: present
+        src: "{{ playbook_dir }}/../helm/postgres/cluster.yaml"
+
+    # -------------------------------------------------------------------------
+    # metrics-server (required for HPA)
+    # -------------------------------------------------------------------------
+    - name: Install metrics-server
+      kubernetes.core.k8s:
+        state: present
+        src: https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml

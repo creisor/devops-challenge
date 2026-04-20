@@ -1,0 +1,48 @@
+---
+# Ansible inventory for devops-challenge deployment prerequisites.
+#
+# Fill in the values marked with <...> before running the playbook.
+# The playbook targets the Ubuntu host that runs the k3s VMs and
+# the GitHub Actions self-hosted runner.
+#
+# Usage:
+#   ansible-playbook ansible/prerequisites.yml -i ansible/inventory.yml
+#
+# Required collections:
+#   ansible-galaxy collection install community.general kubernetes.core
+
+all:
+  hosts:
+    ubuntu_host:
+      ansible_host: <ubuntu-host-ip>      # LAN IP of the Ubuntu machine
+      ansible_user: <ssh-username>         # SSH user with sudo access
+      # ansible_ssh_private_key_file: ~/.ssh/id_ed25519  # uncomment if needed
+
+  vars:
+    # GitHub Actions runner
+    github_repo_url: https://github.com/<org>/<repo>   # e.g. https://github.com/acme/devops-challenge
+    github_runner_token: <runner-registration-token>    # from Settings → Actions → Runners → New runner (expires in 1h)
+    github_runner_dir: /home/{{ ansible_user }}/actions-runner
+
+    # GitHub Container Registry
+    ghcr_username: <github-username>
+    ghcr_token: <github-pat-write-packages>   # same value as GHCR_TOKEN secret
+
+    # k3s VM static IP assignments (must match virsh net-update reservations)
+    k3s_vms:
+      - name: k3s-control
+        mac: <MAC-address-of-k3s-control>    # virsh dumpxml k3s-control | grep 'mac address'
+        ip: 192.168.122.10
+      - name: k3s-worker1
+        mac: <MAC-address-of-k3s-worker1>
+        ip: 192.168.122.11
+      - name: k3s-worker2
+        mac: <MAC-address-of-k3s-worker2>
+        ip: 192.168.122.12
+      - name: k3s-worker3
+        mac: <MAC-address-of-k3s-worker3>
+        ip: 192.168.122.13
+
+    # Kubernetes
+    k3s_control_ip: 192.168.122.10
+    kubeconfig_path: /etc/rancher/k3s/k3s.yaml   # path on the Ubuntu host (copied from k3s-control)
