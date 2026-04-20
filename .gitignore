@@ -40,3 +40,4 @@ yarn-error.log*
 
 prisma/generated
 .pnpm-store
+worktrees/

@@ -1,0 +1,21 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git fetch:*)",
+      "Bash(git worktree:*)",
+      "Bash(helm template:*)",
+      "Bash(chmod +x:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(trivy image:*)",
+      "Bash(python3 -c ':*)",
+      "Bash(pnpm install:*)",
+      "Bash(docker build:*)",
+      "Bash(docker run:*)",
+      "Bash(xargs -I{} sh -c 'echo \"--- {}\" && grep \"\\\\\"version\\\\\"\" {}')",
+      "Bash(git push:*)",
+      "Bash(gh pr:*)",
+      "Bash(grep -E \"^\\(---$|  name:|kind:|POSTGRES\\)\")"
+    ]
+  }
+}
