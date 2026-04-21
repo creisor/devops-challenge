@@ -159,6 +159,22 @@
   environment:
     KUBECONFIG: "{{ kubeconfig_path }}"
 
+  pre_tasks:
+    - name: Assert kubeconfig exists on Ubuntu host
+      ansible.builtin.stat:
+        path: "{{ kubeconfig_path }}"
+      register: kubeconfig_stat
+
+    - name: Fail with instructions if kubeconfig is missing
+      ansible.builtin.fail:
+        msg: |
+          Kubeconfig not found at {{ kubeconfig_path }}.
+          Copy it from the k3s-control node first:
+            ssh ubuntu@192.168.122.10 'sudo cat /etc/rancher/k3s/k3s.yaml' \
+              | sed 's|https://127.0.0.1:6443|https://192.168.122.10:6443|' \
+              | sudo tee {{ kubeconfig_path }}
+      when: not kubeconfig_stat.stat.exists
+
   tasks:
     # -------------------------------------------------------------------------
     # Namespace
