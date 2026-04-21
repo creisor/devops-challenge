@@ -91,6 +91,8 @@ Add `192.168.122.10  devops-challenge.local` to `/etc/hosts`, then visit `http:/
 
 See [docs/networking.md](docs/networking.md) for full setup, persistent route config, and the required libvirt iptables rule. An SSH tunnel fallback is documented in [docs/ssh-tunnel.md](docs/ssh-tunnel.md).
 
+Run `./scripts/setup-tls.sh` once to install a locally-trusted mkcert certificate — after the next deploy the app is reachable at `https://devops-challenge.local`. See [docs/tls.md](docs/tls.md).
+
 ### Terraform
 
 Terraform was evaluated and determined to be out of scope for this local k3s
