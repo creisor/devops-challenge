@@ -258,7 +258,11 @@ Add an entry so `devops-challenge.local` resolves to the k3s-control node
 192.168.122.10  devops-challenge.local
 ```
 
-After this, the app is reachable at `http://devops-challenge.local`.
+After this, the app is reachable at `https://devops-challenge.local` (or `http://` — both are served).
+
+> **TLS setup required:** Run `./scripts/setup-tls.sh` once from your Macbook to generate a
+> locally-trusted certificate and install it as a Kubernetes secret. See
+> [docs/tls.md](tls.md) for details.
 
 ## Macbook — kubectl / Helm Access
 
