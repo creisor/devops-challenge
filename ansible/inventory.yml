@@ -59,4 +59,4 @@ all:
 
     # Kubernetes
     k3s_control_ip: 192.168.122.10
-    kubeconfig_path: /etc/rancher/k3s/k3s.yaml   # path on the Ubuntu host (copied from k3s-control)
+    kubeconfig_path: /home/creisor/.kube/config
