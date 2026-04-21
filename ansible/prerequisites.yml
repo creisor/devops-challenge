@@ -36,12 +36,7 @@
           # - docker.io
           - curl
           - libvirt-clients   # provides virsh
-          - python3-pip
-        state: present
-
-    - name: Install kubernetes Python library (required by kubernetes.core collection)
-      ansible.builtin.pip:
-        name: kubernetes
+          - python3-kubernetes  # required by kubernetes.core Ansible collection
         state: present
 
     # - name: Install kubectl
