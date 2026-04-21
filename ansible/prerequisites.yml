@@ -226,7 +226,7 @@
     - name: Apply PostgreSQL cluster manifest
       kubernetes.core.k8s:
         state: present
-        src: "{{ playbook_dir }}/../helm/postgres/cluster.yaml"
+        definition: "{{ lookup('file', playbook_dir + '/../helm/postgres/cluster.yaml') | from_yaml }}"
 
     # -------------------------------------------------------------------------
     # metrics-server (required for HPA)
